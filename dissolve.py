@@ -88,7 +88,8 @@ class dissolve(QgsProcessingAlgorithm):
         self.addParameter(QgsProcessingParameterField(self.FIELD,
                                                       'Dissolve field. Ignored if "Dissolve all" is selected.',
                                                       None,
-                                                      self.INPUT_LAYER))
+                                                      self.INPUT_LAYER,
+                                                      allowMultiple=True))
         self.addParameter(QgsProcessingParameterBoolean(self.SINGLE,
                                                         'Force output as singlepart',
                                                         False))
@@ -126,7 +127,7 @@ class dissolve(QgsProcessingAlgorithm):
         geomColumn = uri.geometryColumn()
         srid = inLayerA.crs().postgisSrid()
 
-        field = self.parameterAsString(parameters, self.FIELD, context)
+        fields = self.parameterAsFields(parameters, self.FIELD, context)
         statsatt = self.parameterAsString(parameters, self.STATSATT, context)
 
         stats = self.parameterAsBool(parameters, self.STATS, context)
@@ -139,25 +140,22 @@ class dissolve(QgsProcessingAlgorithm):
         table = self.parameterAsString(parameters, self.TABLE, context)
         options = self.parameterAsString(parameters, self.OPTIONS, context)
 
-        if single:
-           layertype = "POLYGON"
+        if len(fields) > 0:
+            print("ok")
+            fieldstringGB = ', '.join([f for f in fields])
         else:
-           layertype = "MULTIPOLYGON"
-
-        if dissolveall:
-           fieldstring = ""
-        else:
-           fieldstring = "," + field
+            fieldstringGB = ""
 
         if single:
-           layertype = "POLYGON"
+            layertype = "POLYGON"
         else:
-           layertype = "MULTIPOLYGON"
+            layertype = "MULTIPOLYGON"
 
         if dissolveall:
-           fieldstring = ""
+            fieldstring = ""
         else:
-           fieldstring = "," + field
+            fieldstring = ', '.join([f for f in fields])
+            fieldstring = "," + fieldstring
 
         if single:
             querystart = '-sql "SELECT (ST_Dump(ST_Union(' + geomColumn + '))).geom::geometry(POLYGON,' + str(srid) + ')' + fieldstring
@@ -167,7 +165,7 @@ class dissolve(QgsProcessingAlgorithm):
         if dissolveall:
             queryend = ' FROM ' + layernameA + '"' + " -nln " + schema + "." + table + " -nlt " + layertype + " -lco FID=gid -lco GEOMETRY_NAME=geom --config PG_USE_COPY YES"
         else:
-            queryend = ' FROM ' + layernameA + ' GROUP BY ' + field + '"' + " -nln " + schema + "." + table + " -nlt " + layertype + " -lco FID=gid -lco GEOMETRY_NAME=geom --config PG_USE_COPY YES"
+            queryend = ' FROM ' + layernameA + ' GROUP BY ' + fieldstringGB + '"' + " -nln " + schema + "." + table + " -nlt " + layertype + " -lco FID=gid -lco GEOMETRY_NAME=geom --config PG_USE_COPY YES"
 
         if count:
            querycount = ", COUNT(" + geomColumn + ") AS count"
